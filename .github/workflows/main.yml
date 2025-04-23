@@ -1,0 +1,4 @@
+name: Run App for Lab
+
+on:
+  workflow_dispatch:
