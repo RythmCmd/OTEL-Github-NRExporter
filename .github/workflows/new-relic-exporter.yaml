@@ -1,7 +1,6 @@
 name: new-relic-exporter
 
 on:
-  workflow_dispatch:
   workflow_run:
     workflows: ['*']
     types: [completed] # defaults to run on every completed workflow run event
