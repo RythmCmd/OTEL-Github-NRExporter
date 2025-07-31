@@ -1,7 +1,8 @@
 name: Change Tracking Marker
 on:
-  - release
-      types: [published]
+  workflow_dispatch:
+  release:
+    types: [published]
 
 jobs:
   newrelic:
@@ -11,12 +12,17 @@ jobs:
       # This step builds a var with the release tag value to use later
       - name: Set Release Version from Tag
         run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-      # This step creates a new Change Tracking Marker
-      - name: New Relic Application Deployment Marker
+      # This step creates a new Change Tracking Marker for App123
+      - name: App123 Marker
         uses: newrelic/deployment-marker-action@v2.2.0
         with:
           apiKey: ${{ secrets.NEW_RELIC_API_KEY }}
           region: "US"
           guid: ${{ secrets.NEW_RELIC_DEPLOYMENT_ENTITY_GUID }}
           version: "${{ env.RELEASE_VERSION }}"
+          changelog: "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
+          commit: "${{ github.sha }}"
+          description: "Automated Release via Github Actions"
+          deploymenttype: "ROLLING"
+          groupId: "Workshop App Release: ${{ github.ref_name }}"
           user: "${{ github.actor }}"
