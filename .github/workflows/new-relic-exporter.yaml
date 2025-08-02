@@ -35,7 +35,7 @@ jobs:
         run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
       - name: New Relic Deployment Marker
-        uses: newrelic/deployment-marker-action@v2
+        uses: newrelic/deployment-marker-action@v2.2.0
         with:
           apiKey:        ${{ secrets.NEW_RELIC_API_KEY }}
           region:        US
