@@ -20,7 +20,7 @@ jobs:
           # Build GraphQL payload to find the entity tagged "repo=<org>/<repo>"
           PAYLOAD="{\"query\":\"{ actor { entitySearch(queryBuilder: {tags: {value: \\\"${REPO}\\\", key: \\\"repo\\\"}}) { results { entities { guid } } } } }\"}"
           # Call NerdGraph and extract the GUID
-          GUID=$(curl -s -X POST https://api.newrelic.com/graphql \
+          GUID=$(curl -s -X POST https://api.eu.newrelic.com/graphql \
             -H "Content-Type: application/json" \
             -H "API-Key: $NEW_RELIC_API_KEY" \
             -d "$PAYLOAD" \
