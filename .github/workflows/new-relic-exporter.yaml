@@ -1,28 +1,52 @@
 name: Change Tracking Marker
 on:
-  workflow_dispatch:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   newrelic:
     runs-on: ubuntu-latest
-    name: New Relic
     steps:
-      # This step builds a var with the release tag value to use later
-      - name: Set Release Version from Tag
+      - uses: actions/checkout@v3
+
+      # 1. Lookup the NR entity GUID by the repo→tag mapping
+      - name: Resolve New Relic Entity GUID by Tag
+        id: resolve
+        env:
+          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+          REPO:                ${{ github.repository }}
+        run: |
+          # Build a GraphQL payload searching for tag “repo=<org>/<repo>”
+          PAYLOAD=$(jq -n --arg q "tags.key = 'repo' AND tags.value = \"$REPO\"" '{
+            query: "query($q:String!) { actor { entitySearch(query: $q) { results { entities { guid } } } } }",
+            variables: { q: $q }
+          }')
+
+          # Call NerdGraph and extract the first GUID
+          GUID=$(curl -s -X POST https://api.newrelic.com/graphql \
+            -H "Content-Type: application/json" \
+            -H "API-Key: $NEW_RELIC_API_KEY" \
+            --data "$PAYLOAD" \
+          | jq -r '.data.actor.entitySearch.results.entities[0].guid')
+
+          echo "ENTITY_GUID=$GUID" >> $GITHUB_ENV
+
+      # 2. Capture the release tag as the deployment version
+      - name: Set Release Version
         run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
-      # This step creates a new Change Tracking Marker for App123
-      - name: App123 Marker
-        uses: newrelic/deployment-marker-action@v2.2.0
+
+      # 3. Fire the New Relic deployment marker
+      - name: New Relic Deployment Marker
+        uses: newrelic/deployment-marker-action@v2
         with:
-          apiKey: ${{ secrets.NEW_RELIC_API_KEY }}
-          region: "EU"
-          guid: ${{ secrets.NEW_RELIC_DEPLOYMENT_ENTITY_GUID }}
-          version: "${{ env.RELEASE_VERSION }}"
-          changelog: "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
-          commit: "${{ github.sha }}"
-          description: "Automated Release via Github Actions"
-          deploymenttype: "ROLLING"
-          groupId: "Workshop App Release: ${{ github.ref_name }}"
-          user: "${{ github.actor }}"
+          apiKey:        ${{ secrets.NEW_RELIC_API_KEY }}
+          region:        EU               # or EU
+          guid:          ${{ env.ENTITY_GUID }}
+          version:       ${{ env.RELEASE_VERSION }}
+          commit:        ${{ github.sha }}
+          changelog:     "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
+          description:   "Automated Release via GitHub Actions"
+          deploymenttype: ROLLING
+          groupId:       "Release: ${{ github.ref_name }}"
+          user:          ${{ github.actor }}
