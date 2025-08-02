@@ -18,25 +18,24 @@ jobs:
           REPO:                ${{ github.repository }}
         run: |
           # Build GraphQL payload to find the entity tagged "repo=<org>/<repo>"
-          read -r -d '' PAYLOAD <<EOF
-{"query":"{ actor { entitySearch(queryBuilder: {tags: {value: \"${REPO}\", key: \"repo\"}}) { results { entities { guid } } } } }"}
-EOF
+          PAYLOAD="{\"query\":\"{ actor { entitySearch(queryBuilder: {tags: {value: \\\"${REPO}\\\", key: \\\"repo\\\"}}) { results { entities { guid } } } } }\"}"
           # Call NerdGraph and extract the GUID
           GUID=$(curl -s -X POST https://api.newrelic.com/graphql \
             -H "Content-Type: application/json" \
             -H "API-Key: $NEW_RELIC_API_KEY" \
-            --data "$PAYLOAD" \
+            -d "$PAYLOAD" \
           | jq -r '.data.actor.entitySearch.results.entities[0].guid')
           echo "ENTITY_GUID=$GUID" >> $GITHUB_ENV
 
       - name: Set Release Version
-        run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+        run: |
+          echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
       - name: New Relic Deployment Marker
         uses: newrelic/deployment-marker-action@v2
         with:
           apiKey:        ${{ secrets.NEW_RELIC_API_KEY }}
-          region:        US                       # or "EU"
+          region:        US                   # or "EU"
           guid:          ${{ env.ENTITY_GUID }}
           version:       ${{ env.RELEASE_VERSION }}
           commit:        ${{ github.sha }}
