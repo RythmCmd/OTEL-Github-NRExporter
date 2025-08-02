@@ -10,20 +10,19 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      # 1. Lookup the NR entity GUID by the repo→tag mapping
       - name: Resolve New Relic Entity GUID by Tag
         id: resolve
         env:
           NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
           REPO:                ${{ github.repository }}
-        run:
-          # Build a GraphQL payload searching for tag “repo=<org>/<repo>”
+        run: |
+          # Build a GraphQL payload searching for tag "repo=<org>/<repo>"
           PAYLOAD=$(jq -n --arg q "tags.key = 'repo' AND tags.value = \"$REPO\"" '{
-            query: "query($q:String!) { actor { entitySearch(query: $q) { results { entities { guid } } } } }",
-            variables: { q: $q }
+            "query":     "query($q:String!){ actor { entitySearch(query: $q) { results { entities { guid } } } } }",
+            "variables": { "q": $q }
           }')
 
-          # Call NerdGraph and extract the first GUID
+          # Call NerdGraph and pull out the first GUID
           GUID=$(curl -s -X POST https://api.newrelic.com/graphql \
             -H "Content-Type: application/json" \
             -H "API-Key: $NEW_RELIC_API_KEY" \
@@ -32,16 +31,14 @@ jobs:
 
           echo "ENTITY_GUID=$GUID" >> $GITHUB_ENV
 
-      # 2. Capture the release tag as the deployment version
       - name: Set Release Version
         run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
-      # 3. Fire the New Relic deployment marker
       - name: New Relic Deployment Marker
         uses: newrelic/deployment-marker-action@v2
         with:
           apiKey:        ${{ secrets.NEW_RELIC_API_KEY }}
-          region:        EU               # or EU
+          region:        US
           guid:          ${{ env.ENTITY_GUID }}
           version:       ${{ env.RELEASE_VERSION }}
           commit:        ${{ github.sha }}
@@ -49,4 +46,4 @@ jobs:
           description:   "Automated Release via GitHub Actions"
           deploymenttype: ROLLING
           groupId:       "Release: ${{ github.ref_name }}"
-          user:          ${{ github.actor }}
+          user:          ${{ github.actor }}"
