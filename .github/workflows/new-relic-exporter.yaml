@@ -16,7 +16,7 @@ jobs:
         env:
           NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
           REPO:                ${{ github.repository }}
-        run: |
+        run:
           # Build a GraphQL payload searching for tag “repo=<org>/<repo>”
           PAYLOAD=$(jq -n --arg q "tags.key = 'repo' AND tags.value = \"$REPO\"" '{
             query: "query($q:String!) { actor { entitySearch(query: $q) { results { entities { guid } } } } }",
