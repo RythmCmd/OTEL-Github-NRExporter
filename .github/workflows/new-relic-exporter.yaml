@@ -17,9 +17,7 @@ jobs:
           NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
           REPO:                ${{ github.repository }}
         run: |
-          # Build GraphQL payload to find the entity tagged "repo=<org>/<repo>"
           PAYLOAD="{\"query\":\"{ actor { entitySearch(queryBuilder:{tags:{value:\\\"${REPO}\\\",key:\\\"repo\\\"}}){results{entities{guid}}}}}\"}"
-          # Call NerdGraph and extract the GUID
           GUID=$(curl -s -X POST https://api.eu.newrelic.com/graphql \
             -H "Content-Type: application/json" \
             -H "API-Key: $NEW_RELIC_API_KEY" \
@@ -28,21 +26,25 @@ jobs:
           echo "ENTITY_GUID=$GUID" >> $GITHUB_ENV
 
       - name: Set Release Version
-        run: |
-          echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+        run: echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
-      - name: New Relic Deployment Marker
-        if: always()    # ensure this runs even if earlier steps failed
-        uses: newrelic/deployment-marker-action@v2.5.1
-        with:
-          apiKey:         ${{ secrets.NEW_RELIC_API_KEY }}
-          region:         EU
-          guid:           ${{ env.ENTITY_GUID }}
-          version:        ${{ env.RELEASE_VERSION }}
-          commit:         ${{ github.sha }}
-          changelog:      "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
-          description:    "Automated Release via GitHub Actions — status: ${{ job.status }}"
-          status:         ${{ job.status }}
-          deploymenttype: ROLLING
-          groupId:        "Release: ${{ github.ref_name }}"
-          user:           ${{ github.actor }}
+      - name: Send Change Tracking Event
+        if: always()    # run even on failure/cancel
+        env:
+          NEW_RELIC_API_KEY: ${{ secrets.NEW_RELIC_API_KEY }}
+          ENTITY_GUID:       ${{ env.ENTITY_GUID }}
+          RELEASE_VERSION:   ${{ env.RELEASE_VERSION }}
+          JOB_STATUS:        ${{ job.status }}
+          GITHUB_REPO:       ${{ github.repository }}
+          GITHUB_SHA:        ${{ github.sha }}
+          GITHUB_ACTOR:      ${{ github.actor }}
+        run: |
+          # Build the GraphQL mutation payload
+          read -r -d '' PAYLOAD <<EOF
+{"query":"mutation { changeTrackingCreateEvent(changeTrackingEvent:{categoryAndTypeData:{categoryFields:{deployment:{version:\\\"$RELEASE_VERSION\\\"}}kind:{category:\\\"Deployment\\\",type:\\\"Rolling\\\"}}entitySearch:{query:\\\"id = '$ENTITY_GUID'\\\"}description:\\\"Automated Release via GitHub Actions — status: $JOB_STATUS\\\"user:\\\"$GITHUB_ACTOR\\\"commit:\\\"$GITHUB_SHA\\\"changelog:\\\"https://github.com/$GITHUB_REPO/blob/master/CHANGELOG.md\\\"groupId:\\\"Release: $RELEASE_VERSION\\\"})}"}EOF
+
+          # Send the mutation to NerdGraph
+          curl -s -X POST https://api.eu.newrelic.com/graphql \
+            -H "Content-Type: application/json" \
+            -H "API-Key: $NEW_RELIC_API_KEY" \
+            -d "$PAYLOAD"
