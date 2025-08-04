@@ -18,7 +18,7 @@ jobs:
           REPO:                ${{ github.repository }}
         run: |
           # Build GraphQL payload to find the entity tagged "repo=<org>/<repo>"
-          PAYLOAD="{\"query\":\"{ actor { entitySearch(queryBuilder: {tags: {value: \\\"${REPO}\\\", key: \\\"repo\\\"}}) { results { entities { guid } } } } }\"}"
+          PAYLOAD="{\"query\":\"{ actor { entitySearch(queryBuilder:{tags:{value:\\\"${REPO}\\\",key:\\\"repo\\\"}}){results{entities{guid}}}}}\"}"
           # Call NerdGraph and extract the GUID
           GUID=$(curl -s -X POST https://api.eu.newrelic.com/graphql \
             -H "Content-Type: application/json" \
@@ -32,15 +32,17 @@ jobs:
           echo "RELEASE_VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
 
       - name: New Relic Deployment Marker
-        uses: newrelic/deployment-marker-action@v2.2.0
+        if: always()    # ensure this runs even if earlier steps failed
+        uses: newrelic/deployment-marker-action@v2.5.1
         with:
-          apiKey:        ${{ secrets.NEW_RELIC_API_KEY }}
-          region:        EU                   # or "EU"
-          guid:          ${{ env.ENTITY_GUID }}
-          version:       ${{ env.RELEASE_VERSION }}
-          commit:        ${{ github.sha }}
-          changelog:     "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
-          description:   "Automated Release via GitHub Actions"
+          apiKey:         ${{ secrets.NEW_RELIC_API_KEY }}
+          region:         EU
+          guid:           ${{ env.ENTITY_GUID }}
+          version:        ${{ env.RELEASE_VERSION }}
+          commit:         ${{ github.sha }}
+          changelog:      "https://github.com/${{ github.repository }}/blob/master/CHANGELOG.md"
+          description:    "Automated Release via GitHub Actions — status: ${{ job.status }}"
+          status:         ${{ job.status }}
           deploymenttype: ROLLING
-          groupId:       "Release: ${{ github.ref_name }}"
-          user:          ${{ github.actor }}
+          groupId:        "Release: ${{ github.ref_name }}"
+          user:           ${{ github.actor }}
